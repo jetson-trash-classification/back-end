@@ -1,8 +1,8 @@
 import requests, web, json
 
 urls = (
-    '/history(.*)', 'history_index',
-    '/settings(.*)', 'settings_index'
+    '/history', 'history_index',
+    '/settings', 'settings_index'
 )
 
 db = web.database( 
@@ -14,7 +14,7 @@ db = web.database(
     pw='hgg'
 )
 
-jetson_url = 'http://192.168.137.10:3000'
+jetson_url = 'http://192.168.137.192:3000'
 
 def to_json(obj):
     return json.loads(json.dumps(obj))
@@ -25,21 +25,22 @@ def get_url():
 def to_list(obj):
     res = []
     for data in obj:
-        res.append(to_json(data))
+        res.append(to_json(data.value))
     return res
 
 class history_index:
-    def POST(self, data):
+    def POST(self):
+        data = json.loads(web.data())
         # 往数据库插入一条垃圾放置数据
-        db.insert('history_tb', key=data.time, value=json.dumps(data))
+        db.insert('history_tb', key=data['data']['time'], value=json.dumps(data))
         # 更新垃圾桶当前的容量
-        id = data.position
+        id = data['position']
         res = db.select('settings_tb', what="value", where={'settings_tb.key': id})
-        res = to_json(res[0])
-        res.curCapacity += 1
+        res = to_json(res[0].value)
+        res['curCapacity'] += 1
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(res))
     
-    def GET(self, data):
+    def GET(self):
         # 返回所有垃圾放置数据
         res = db.select('history_tb', what="value")
         res = to_list(res)
@@ -49,32 +50,38 @@ class history_index:
 
 class settings_index:
     
-    def GET(self, id):
+    def GET(self):
+        id = web.data().decode()
         # 查询某一个/所有垃圾站点的数据
-        if id is None:
+        if id=='':
             res = db.select('settings_tb', what="value")
             res = to_list(res)
         else:
             res = db.select('settings_tb', where={'settings_tb.key': id}, what="value")
-            res = to_json(res[0])
+            res = to_json(res[0].value)
+        web.header("Content-Type", "application/json")
         web.header("Access-Control-Allow-Origin", "*")
-        return res
+        return json.dumps(res)
 
-    def POST(self, data):
+    def POST(self):
         # 修改数据库中jetson的设置
-        id = data.id
+        data = json.loads(web.data())
+        id = data['data']['id']
         res = db.select('settings_tb', what="value")
-        res = to_json(res[0])
-        data.curCapacity = res.curCapacity
+        res = to_json(res[0].value)
+        data['data']['curCapacitity'] = res['data']['curCapacitity']
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(data))
 
         # 修改jetson中的设置
         requests.post(url=jetson_url, data=data)
     
-    def PUT(self, data):
+    def PUT(self):
+        data = json.loads(web.data())
         # 添加jetson的设置
-        db.insert('settings_tb', key=id, value=json.dumps(data))
+        db.insert('settings_tb', key=data['data']['id'], value=json.dumps(data))
 
+    def OPTIONS(self):
+        pass
 
 if __name__ == "__main__":
     app = web.application(urls, globals())
