@@ -1,3 +1,5 @@
+from email import header
+from socket import timeout
 import requests, web, json
 
 urls = (
@@ -13,8 +15,6 @@ db = web.database(
     db='postgres',
     pw='hgg'
 )
-
-jetson_url = 'http://192.168.137.192:3000/'
 
 def to_json(obj):
     return json.loads(json.dumps(obj))
@@ -71,7 +71,13 @@ class settings_index:
         res = to_json(res[0].value)
         data['data']['curCapacitity'] = res['data']['curCapacitity']
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(data))
-    
+        header = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json", }
+        try:
+            requests.post(res['data']['url'], data=json.dumps(res), headers=header, timeout=6)
+        except Exception as e:
+            print('Post error: %s'%(str(e)))
+
+
     def PUT(self):
         data = json.loads(web.data())
         # 添加jetson的设置
