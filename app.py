@@ -14,7 +14,7 @@ db = web.database(
     pw='hgg'
 )
 
-jetson_url = 'http://192.168.137.192:3000'
+jetson_url = 'http://192.168.137.192:3000/'
 
 def to_json(obj):
     return json.loads(json.dumps(obj))
@@ -71,9 +71,6 @@ class settings_index:
         res = to_json(res[0].value)
         data['data']['curCapacitity'] = res['data']['curCapacitity']
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(data))
-
-        # 修改jetson中的设置
-        requests.post(url=jetson_url, data=data)
     
     def PUT(self):
         data = json.loads(web.data())
