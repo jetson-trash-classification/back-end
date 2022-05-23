@@ -1,5 +1,3 @@
-from email import header
-from socket import timeout
 import requests, web, json
 
 urls = (
@@ -73,7 +71,7 @@ class settings_index:
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(data))
         header = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json", }
         try:
-            requests.post(res['data']['url'], data=json.dumps(res), headers=header, timeout=6)
+            requests.post(data['data']['url'], data=json.dumps(data), headers=header, timeout=6)
         except Exception as e:
             print('Post error: %s'%(str(e)))
 
