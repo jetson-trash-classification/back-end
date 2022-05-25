@@ -2,7 +2,8 @@ import requests, web, json
 
 urls = (
     '/history', 'history_index',
-    '/settings', 'settings_index'
+    '/settings', 'settings_index',
+    '/analysis', 'analysis_index'
 )
 
 db = web.database( 
@@ -49,14 +50,9 @@ class history_index:
 class settings_index:
     
     def GET(self):
-        id = web.data().decode()
         # 查询某一个/所有垃圾站点的数据
-        if id=='':
-            res = db.select('settings_tb', what="value")
-            res = to_list(res)
-        else:
-            res = db.select('settings_tb', where={'settings_tb.key': id}, what="value")
-            res = to_json(res[0].value)
+        res = db.select('settings_tb', what="value")
+        res = to_list(res)
         web.header("Content-Type", "application/json")
         web.header("Access-Control-Allow-Origin", "*")
         return json.dumps(res)
@@ -83,6 +79,32 @@ class settings_index:
 
     def OPTIONS(self):
         pass
+
+class analysis_index:
+    def GET(self):
+        data = web.input()
+        res = []
+        if data['type'] == 'pie':
+            res = db.select(
+                'history_tb', 
+                what="history_tb.value::json #>> '{type}' as name, count(*) as value", 
+                group="history_tb.value::json #>> '{type}'"
+            )
+            res = list(res)
+        if data['type'] == 'bar':
+            res = db.select(
+                'history_tb', 
+                what="split_part(history_tb.value::json #>> '{time}', ' ', 1) as day," 
+                     "sum(case history_tb.value::json #>> '{type}' when 'food' then 1 else 0 end) as food, "
+                     "sum(case history_tb.value::json #>> '{type}' when 'residual' then 1 else 0 end) as residual, "
+                     "sum(case history_tb.value::json #>> '{type}' when 'hazardous' then 1 else 0 end) as hazardous, "
+                     "sum(case history_tb.value::json #>> '{type}' when 'recyclable' then 1 else 0 end) as recyclable",
+                group="day"
+            )
+            res = list(res)
+        web.header("Access-Control-Allow-Origin", "*")
+        web.header("Content-Type", "application/json")
+        return json.dumps(res)    
 
 if __name__ == "__main__":
     app = web.application(urls, globals())
