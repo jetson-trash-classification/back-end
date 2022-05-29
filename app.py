@@ -39,7 +39,7 @@ class history_index:
         res = db.select('settings_tb', what="value", where={'settings_tb.key': id})
         res = to_json(res[0].value)
         res['data']['curCapacity'] += 1
-        res['data']['capacityRate']
+        res['data']['capacityRate'] = res['data']['curCapacity']/res['data']['totalCapacity']
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(res))
     
     def GET(self):
@@ -69,9 +69,10 @@ class settings_index:
         # 修改数据库中jetson的设置
         data = json.loads(web.data())
         id = data['data']['id']
-        res = db.select('settings_tb', what="value")
+        res = db.select('settings_tb', where={'settings_tb.key': id}, what="value")
         res = to_json(res[0].value)
         data['data']['curCapacity'] = res['data']['curCapacity']
+        data['data']['capacityRate'] = res['data']['capacityRate']
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(data))
         header = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json", }
         try:
