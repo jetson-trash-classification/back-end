@@ -1,3 +1,4 @@
+from certifi import where
 import requests, web, json
 
 urls = (
@@ -29,14 +30,16 @@ def to_list(obj):
 
 class history_index:
     def POST(self):
+        print(web.data().decode())
         data = json.loads(web.data())
         # 往数据库插入一条垃圾放置数据
-        db.insert('history_tb', key=data['data']['time'], value=json.dumps(data))
+        db.insert('history_tb', key=data['time'], value=json.dumps(data))
         # 更新垃圾桶当前的容量
         id = data['position']
         res = db.select('settings_tb', what="value", where={'settings_tb.key': id})
         res = to_json(res[0].value)
-        res['curCapacity'] += 1
+        res['data']['curCapacity'] += 1
+        res['data']['capacityRate']
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(res))
     
     def GET(self):
@@ -51,8 +54,13 @@ class settings_index:
     
     def GET(self):
         # 查询某一个/所有垃圾站点的数据
-        res = db.select('settings_tb', what="value")
-        res = to_list(res)
+        data = web.data().decode()
+        if data == "":
+            res = db.select('settings_tb', what="value")
+            res = to_list(res)
+        else :
+            res = db.select('settings_tb', what="value", where={"key": data})
+            res = to_list(res)[0]
         web.header("Content-Type", "application/json")
         web.header("Access-Control-Allow-Origin", "*")
         return json.dumps(res)
@@ -63,7 +71,7 @@ class settings_index:
         id = data['data']['id']
         res = db.select('settings_tb', what="value")
         res = to_json(res[0].value)
-        data['data']['curCapacitity'] = res['data']['curCapacitity']
+        data['data']['curCapacity'] = res['data']['curCapacity']
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(data))
         header = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json", }
         try:
