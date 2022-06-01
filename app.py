@@ -1,7 +1,8 @@
-from certifi import where
+import os
 import requests, web, json
 
 urls = (
+    '/', 'home_index',
     '/history', 'history_index',
     '/settings', 'settings_index',
     '/analysis', 'analysis_index'
@@ -16,6 +17,8 @@ db = web.database(
     pw='hgg'
 )
 
+type_list = [ "food", "hazardous", "recyclable", "residual"]
+
 def to_json(obj):
     return json.loads(json.dumps(obj))
 
@@ -28,9 +31,24 @@ def to_list(obj):
         res.append(to_json(data.value))
     return res
 
+class home_index:
+        def GET(self):
+            with open("static/index.html", encoding='utf-8') as f:
+                res = f.read()
+            return res
+
 class history_index:
+    
+    def PUT(self):
+        """清空回收站"""
+        id = web.data().decode()
+        res = db.select('settings_tb', where={'settings_tb.key': id}, what="value")
+        res = to_json(res[0].value)
+        for type in type_list:
+            res['data'][type+'Cur'] = 0
+        db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(res))
+
     def POST(self):
-        print(web.data().decode())
         data = json.loads(web.data())
         # 往数据库插入一条垃圾放置数据
         db.insert('history_tb', key=data['time'], value=json.dumps(data))
@@ -38,8 +56,7 @@ class history_index:
         id = data['position']
         res = db.select('settings_tb', what="value", where={'settings_tb.key': id})
         res = to_json(res[0].value)
-        res['data']['curCapacity'] += 1
-        res['data']['capacityRate'] = res['data']['curCapacity']/res['data']['totalCapacity']
+        res['data'][type_list[data['type']]+'Cur'] += 1
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(res))
     
     def GET(self):
@@ -71,8 +88,8 @@ class settings_index:
         id = data['data']['id']
         res = db.select('settings_tb', where={'settings_tb.key': id}, what="value")
         res = to_json(res[0].value)
-        data['data']['curCapacity'] = res['data']['curCapacity']
-        data['data']['capacityRate'] = res['data']['capacityRate']
+        for type in type_list:
+            data['data'][type+'Cur'] = res['data'][type+'Cur']
         db.update('settings_tb', where={'settings_tb.key': id}, value=json.dumps(data))
         header = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json", }
         try:
@@ -104,10 +121,10 @@ class analysis_index:
             res = db.select(
                 'history_tb', 
                 what="split_part(history_tb.value::json #>> '{time}', ' ', 1) as day," 
-                     "sum(case history_tb.value::json #>> '{type}' when 'food' then 1 else 0 end) as food, "
-                     "sum(case history_tb.value::json #>> '{type}' when 'residual' then 1 else 0 end) as residual, "
-                     "sum(case history_tb.value::json #>> '{type}' when 'hazardous' then 1 else 0 end) as hazardous, "
-                     "sum(case history_tb.value::json #>> '{type}' when 'recyclable' then 1 else 0 end) as recyclable",
+                     "sum(case history_tb.value::json #>> '{type}' when '0' then 1 else 0 end) as 厨余, "
+                     "sum(case history_tb.value::json #>> '{type}' when '1' then 1 else 0 end) as 有害, "
+                     "sum(case history_tb.value::json #>> '{type}' when '2' then 1 else 0 end) as 可回收, "
+                     "sum(case history_tb.value::json #>> '{type}' when '3' then 1 else 0 end) as 其他",
                 group="day"
             )
             res = list(res)
